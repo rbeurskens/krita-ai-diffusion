@@ -10,10 +10,10 @@ from typing import Any, NamedTuple
 
 # Version identifier for all the resources defined here. This is used as the server version.
 # It usually follows the plugin version, but not all new plugin versions also require a server update.
-version = "1.51.0"
+version = "1.53.0"
 
 comfy_url = "https://github.com/comfyanonymous/ComfyUI"
-comfy_version = "025e6792ee64181ddce8a84411e0c7311e00b179"
+comfy_version = "4da9e2dbead52fc1e68beae33fe3d7ad63b63241"
 
 
 class CustomNode(NamedTuple):
@@ -29,7 +29,7 @@ required_custom_nodes = [
         "ControlNet Preprocessors",
         "comfyui_controlnet_aux",
         "https://github.com/Fannovel16/comfyui_controlnet_aux",
-        "83463c2e4b04e729268e57f638b4212e0da4badc",
+        "e8b689a513c3e6b63edc44066560ca5919c0576e",
         ["InpaintPreprocessor", "DepthAnythingV2Preprocessor"],
     ),
     CustomNode(
@@ -43,7 +43,7 @@ required_custom_nodes = [
         "External Tooling Nodes",
         "comfyui-tooling-nodes",
         "https://github.com/Acly/comfyui-tooling-nodes",
-        "a1e51904dec9a73b92865b512aa417f10938d608",
+        "ca01116495cad1f2d8440641f26ced8fbdbbe8de",
         ["ETN_LoadImageCache", "ETN_SaveImageCache", "ETN_Translate"],
     ),
     CustomNode(
@@ -68,13 +68,6 @@ optional_custom_nodes = [
         "01f8845bf30d89fff293c7bd50187bc59d9d53ea",
         ["UnetLoaderGGUF", "DualCLIPLoaderGGUF"],
     ),
-    CustomNode(
-        "Nunchaku",
-        "ComfyUI-nunchaku",
-        "https://github.com/nunchaku-tech/ComfyUI-nunchaku",
-        "90999af9c26e4a40927fb26c028ece8875ac25b3",
-        ["NunchakuFluxDiTLoader"],
-    ),
 ]
 
 
@@ -98,6 +91,7 @@ class Arch(Enum):
     anima = "Anima"
     zimage = "Z-Image"
     ernie = "ERNIE Image"
+    krea2 = "Krea 2"
 
     auto = "Automatic"
     all = "All"
@@ -142,6 +136,8 @@ class Arch(Enum):
             return Arch.zimage
         if string in {"ernie-image", "ernie_image"}:
             return Arch.ernie
+        if string == "krea2":
+            return Arch.krea2
         return None
 
     @staticmethod
@@ -181,7 +177,7 @@ class Arch(Enum):
 
     @property
     def supports_regions(self):
-        return self in [Arch.sd15, Arch.sdxl, Arch.illu, Arch.illu_v]
+        return self in [Arch.sd15, Arch.sdxl, Arch.illu, Arch.illu_v, Arch.anima]
 
     @property
     def supports_lcm(self):
@@ -249,7 +245,10 @@ class Arch(Enum):
                 return ["qwen_3_4b"]
             case Arch.ernie:
                 return ["ministral"]
-        raise ValueError(f"Unsupported architecture: {self}")
+            case Arch.krea2:
+                return ["qwen_3vl_4b"]
+            case _:
+                raise ValueError(f"Unsupported architecture: {self}")
 
     @staticmethod
     def list():
@@ -271,6 +270,7 @@ class Arch(Enum):
             Arch.anima,
             Arch.zimage,
             Arch.ernie,
+            Arch.krea2,
         ]
 
 
@@ -476,10 +476,8 @@ class VerificationStatus(NamedTuple):
 
 class ModelRequirements(Enum):
     none = 0
-    insightface = 1
     cuda = 2  # requires CUDA (NVIDIA only)
-    cuda_fp4 = 3  # requires FP4 support (Blackwell)
-    no_cuda = 4  # model alternative for hardware without CUDA support
+    no_cuda = 3  # model alternative for hardware without CUDA support
 
 
 class ModelFile(NamedTuple):
@@ -738,6 +736,7 @@ search_paths: dict[str, list[str]] = {
     resource_id(ResourceKind.controlnet, Arch.illu, ControlMode.universal): ["union-sdxl", "xinsirunion"],
     resource_id(ResourceKind.controlnet, Arch.illu_v, ControlMode.universal): ["union-sdxl", "xinsirunion"],
     resource_id(ResourceKind.controlnet, Arch.anima, ControlMode.universal): ["anima*lllite*any"],
+    resource_id(ResourceKind.controlnet, Arch.anima, ControlMode.segmentation): ["anima-lllite-region-cn", "anima*lllite*region"],
     resource_id(ResourceKind.controlnet, Arch.flux, ControlMode.universal): ["flux.1-dev-controlnet-union-pro-2.0", "flux.1-dev-controlnet-union-pro", "flux.1-dev-controlnet-union", "flux1devcontrolnetunion"],
     resource_id(ResourceKind.controlnet, Arch.qwen, ControlMode.universal): ["qwen-image-instantx-controlnet-union"],
     resource_id(ResourceKind.controlnet, Arch.sd15, ControlMode.scribble): ["control_v11p_sd15_scribble", "control_lora_rank128_v11p_sd15_scribble"],
@@ -754,7 +753,7 @@ search_paths: dict[str, list[str]] = {
     resource_id(ResourceKind.controlnet, Arch.flux, ControlMode.soft_edge): ["mistoline_flux"],
     resource_id(ResourceKind.controlnet, Arch.illu, ControlMode.soft_edge): ["noob-sdxl-controlnet-softedge", "noobaixlcontrolnet_epssoftedge"],
     resource_id(ResourceKind.controlnet, Arch.sd15, ControlMode.canny_edge): ["control_v11p_sd15_canny", "control_lora_rank128_v11p_sd15_canny"],
-    resource_id(ResourceKind.controlnet, Arch.sdxl, ControlMode.canny_edge): ["xinsircanny", "canny-sdxl" "control-lora-canny-rank", "sai_xl_canny_"],
+    resource_id(ResourceKind.controlnet, Arch.sdxl, ControlMode.canny_edge): ["xinsircanny", "canny-sdxl", "control-lora-canny-rank", "sai_xl_canny_"],
     resource_id(ResourceKind.controlnet, Arch.flux, ControlMode.canny_edge): ["flux-canny", "mistoline_flux"],
     resource_id(ResourceKind.controlnet, Arch.illu, ControlMode.canny_edge): ["noob_sdxl_controlnet_canny", "noobaixlcontrolnet_epscanny"],
     resource_id(ResourceKind.controlnet, Arch.sd15, ControlMode.depth): ["control_sd15_depth_anything", "control_v11f1p_sd15_depth", "control_lora_rank128_v11f1p_sd15_depth"],
@@ -818,6 +817,7 @@ search_paths: dict[str, list[str]] = {
     resource_id(ResourceKind.text_encoder, Arch.all, "qwen_3_8b"): ["qwen_3_8b", "qwen3-8b", "qwen3_8b"],
     resource_id(ResourceKind.text_encoder, Arch.all, "qwen_3_06b"): ["qwen_3_06b", "qwen3-06b", "qwen3_06b"],
     resource_id(ResourceKind.text_encoder, Arch.all, "ministral"): ["ministral-3-3b", "ministral"],
+    resource_id(ResourceKind.text_encoder, Arch.all, "qwen_3vl_4b"): ["qwen3vl_4b", "qwen_3vl_4b", "qwen3-vl-4b"],
     resource_id(ResourceKind.vae, Arch.sd15, "default"): ["vae-ft-mse-840000-ema"],
     resource_id(ResourceKind.vae, Arch.sdxl, "default"): ["sdxl_vae"],
     resource_id(ResourceKind.vae, Arch.illu, "default"): ["sdxl_vae"],
@@ -835,6 +835,7 @@ search_paths: dict[str, list[str]] = {
     resource_id(ResourceKind.vae, Arch.anima, "default"): ["qwen_image"],
     resource_id(ResourceKind.vae, Arch.zimage, "default"): ["z-image", "flux-", "flux_", "flux/", "flux1", "ae.s"],
     resource_id(ResourceKind.vae, Arch.ernie, "default"): ["flux2"],
+    resource_id(ResourceKind.vae, Arch.krea2, "default"): ["qwen_image"],
 }
 # fmt: on
 
@@ -870,6 +871,8 @@ required_resource_ids = {
     ResourceId(ResourceKind.vae, Arch.flux2_9b, "default"),
     ResourceId(ResourceKind.text_encoder, Arch.ernie, "ministral"),
     ResourceId(ResourceKind.vae, Arch.ernie, "default"),
+    ResourceId(ResourceKind.text_encoder, Arch.krea2, "qwen_3vl_4b"),
+    ResourceId(ResourceKind.vae, Arch.krea2, "default"),
 }
 
 recommended_resource_ids = [

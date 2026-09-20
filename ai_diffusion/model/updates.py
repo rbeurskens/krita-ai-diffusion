@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import NamedTuple
 
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 
 from .. import __version__, eventloop
 from ..backend.network import RequestManager
@@ -51,7 +51,7 @@ class AutoUpdate(QObject, ObservableProperties):
         api_url: str | None = None,
     ):
         super().__init__()
-        self.plugin_dir = plugin_dir or Path(__file__).parent.parent
+        self.plugin_dir = plugin_dir or Path(__file__).parent.parent.parent
         self.current_version = current_version or __version__
         self.api_url = api_url or self.default_api_url
         self._package: UpdatePackage | None = None

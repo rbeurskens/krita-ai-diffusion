@@ -38,7 +38,7 @@ from .api import (
     WorkflowInput,
     WorkflowKind,
 )
-from .client import ClientModels, ModelDict, Quantization, resolve_arch
+from .client import ClientModels, ModelDict, resolve_arch
 from .comfy_workflow import (
     ComfyNode,
     ComfyRunMode,
@@ -122,25 +122,11 @@ def load_checkpoint_with_lora(w: ComfyWorkflow, checkpoint: CheckpointInput, mod
         raise RuntimeError(f"Style checkpoint {checkpoint.checkpoint} not found")
 
     clip, vae = None, None
-    match (model_info.format, model_info.quantization):
-        case (FileFormat.checkpoint, Quantization.none):
+    match model_info.format:
+        case FileFormat.checkpoint:
             model, clip, vae = w.load_checkpoint(model_info.filename)
-        case (FileFormat.diffusion, Quantization.none):
+        case FileFormat.diffusion:
             model = w.load_diffusion_model(model_info.filename)
-        case (FileFormat.diffusion, Quantization.svdq):
-            if model_info.arch.is_flux_like:
-                cache = 0.12 if checkpoint.dynamic_caching else 0.0
-                model = w.nunchaku_load_flux_diffusion_model(
-                    model_info.filename, cache_threshold=cache
-                )
-            elif model_info.arch == Arch.zimage:
-                model = w.nunchaku_load_zimage_diffusion_model(model_info.filename)
-            elif model_info.arch.is_qwen_like:
-                model = w.nunchaku_load_qwen_diffusion_model(model_info.filename)
-            else:
-                raise RuntimeError(
-                    f"Style checkpoint {checkpoint.checkpoint} has an unsupported quantized format {model_info.format.name}"
-                )
         case _:
             raise RuntimeError(
                 f"Style checkpoint {checkpoint.checkpoint} has an unsupported format {model_info.format.name}"
@@ -175,6 +161,8 @@ def load_checkpoint_with_lora(w: ComfyWorkflow, checkpoint: CheckpointInput, mod
                 clip = w.load_clip(te["qwen_3_4b"], type="lumina2")
             case Arch.ernie:
                 clip = w.load_clip(te["ministral"], type="flux2")
+            case Arch.krea2:
+                clip = w.load_clip(te["qwen_3vl_4b"], type="krea2")
             case _:
                 raise RuntimeError(f"No text encoder for model architecture {arch.name}")
 
@@ -187,16 +175,11 @@ def load_checkpoint_with_lora(w: ComfyWorkflow, checkpoint: CheckpointInput, mod
         vae = w.load_vae(models.for_arch(arch).vae)
 
     support_fbc = arch in [Arch.flux, Arch.sd3] or arch.is_sdxl_like
-    if checkpoint.dynamic_caching and support_fbc and model_info.quantization is Quantization.none:
+    if checkpoint.dynamic_caching and support_fbc:
         model = w.easy_cache(model, arch)
 
     for lora in checkpoint.loras:
-        if arch.is_flux_like and model_info.quantization is Quantization.svdq:
-            model = w.nunchaku_load_flux_lora(model, lora.name, lora.strength)
-        elif arch.is_qwen_like and model_info.quantization is Quantization.svdq:
-            raise RuntimeError("Lora are not yet supported with quantized Qwen models")
-        else:
-            model, clip = w.load_lora(model, clip, lora.name, lora.strength, lora.strength)
+        model, clip = w.load_lora(model, clip, lora.name, lora.strength, lora.strength)
 
     if arch is Arch.sd3:
         model = w.model_sampling_sd3(model)
@@ -1541,15 +1524,16 @@ def build_instructions(cond: ConditioningInput, arch: Arch, inpaint: InpaintMode
     instructions = ""
 
     if not cond.edit_reference and arch.supports_edit:
-        match inpaint:
-            case InpaintMode.fill | InpaintMode.expand:
-                if arch is Arch.flux2_4b:  # requires outpaint Lora for good results
-                    instructions += "Fill the green spaces according to the image.\n"
-            case InpaintMode.add_object:
+        match inpaint, arch:
+            case InpaintMode.fill | InpaintMode.expand, Arch.flux2_4b:
+                instructions += "Fill the green spaces according to the image.\n"
+            case InpaintMode.expand, Arch.flux2_9b:
+                instructions += "Expand the image to fill the empty canvas.\n"
+            case InpaintMode.add_object, _:
                 instructions += "Add the object to the scene.\n"
-            case InpaintMode.remove_object:
+            case InpaintMode.remove_object, _:
                 instructions += "Remove the object.\n"
-            case InpaintMode.replace_background:
+            case InpaintMode.replace_background, _:
                 instructions += "Replace the background while keeping the main subject.\n"
         if instructions != "":
             cond.edit_reference = True
@@ -1745,10 +1729,6 @@ def prepare(
 
     else:
         raise ValueError(f"Workflow {kind.name} not supported by this constructor")
-
-    if minfo := models.checkpoints.get(i.models.checkpoint):
-        if minfo.arch.is_qwen_like and minfo.quantization is Quantization.svdq:
-            i.batch_count = 1  # Nunchaku Qwen is broken with batch size > 1 #2114
 
     if arch is Arch.sdxl and i.inpaint and i.inpaint.use_inpaint_model:
         i.models.dynamic_caching = False  # inpaint model incompatible with dynamic caching

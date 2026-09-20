@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt5.QtCore import QObject, QSize, Qt
-from PyQt5.QtGui import QFontMetrics, QGuiApplication, QIcon, QPalette, QPixmap
-from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PyQt6.QtCore import QObject, QSize, Qt
+from PyQt6.QtGui import QFontMetrics, QGuiApplication, QIcon, QPalette, QPixmap
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from ..backend.client import Client
 from ..files import FileFormat
@@ -27,13 +27,15 @@ highlight = "#80d0f0" if is_dark else "#335577"
 strong_highlight = "#70d0ff" if is_dark else "#2040ff"
 progress_alt = "#a16207" if is_dark else "#ca8a04"
 active = _palette.color(QPalette.ColorRole.Highlight).name()
-line = _palette.color(QPalette.ColorRole.Background).darker(120).name()
+line = _palette.color(QPalette.ColorRole.Window).darker(120).name()
 line_base = _palette.color(QPalette.ColorRole.Base).darker(120).name()
 
 flat_combo_stylesheet = f"""
     QComboBox {{ border: none; background-color: transparent; padding: 1px 12px 1px 2px; }}
     QComboBox QAbstractItemView {{ selection-color: {highlight}; }}
 """
+
+prompt_max_line_count = 40
 
 copy_to_clipboard_string = _("Copy to clipboard")  # keeping translations for future use
 
@@ -86,6 +88,8 @@ def checkpoint_icon(arch: Arch, format: FileFormat | None = None, client: Client
         return icon("sd-version-anima")
     elif arch is Arch.ernie:
         return icon("sd-version-ernie")
+    elif arch is Arch.krea2:
+        return icon("sd-version-krea2")
     else:
         log.warning(f"Unresolved SD version {arch}, cannot fetch icon")
         return icon("warning")
